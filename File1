@@ -1,0 +1,53 @@
+import numpy as np
+import rasterio
+from rasterio.transform import from_origin
+import matplotlib.pyplot as plt
+
+# Step 1: Generate Synthetic Raster Data
+width, height = 100, 100
+transform = from_origin(100.0, 0.0, 0.0001, 0.0001)  # arbitrary geotransform
+
+# Synthetic spectral indices (e.g., NDVI and NDWI)
+ndvi = np.random.uniform(0.2, 0.9, (height, width))
+ndwi = np.random.uniform(-0.2, 0.6, (height, width))
+
+# Step 2: Classify Blue Carbon Ecosystems
+# Threshold-based classification
+blue_carbon_map = np.zeros((height, width), dtype=np.uint8)
+
+# 1 = Mangroves, 2 = Seagrass, 3 = Salt Marsh
+blue_carbon_map[(ndvi > 0.5) & (ndwi > 0.3)] = 1  # Mangroves
+blue_carbon_map[(ndvi > 0.4) & (ndwi < 0.3)] = 2  # Seagrass
+blue_carbon_map[(ndvi <= 0.4)] = 3               # Salt Marsh
+
+# Step 3: Carbon Stock Estimation (tons/ha)
+# Assign average carbon values (simplified)
+carbon_stock = np.zeros_like(ndvi)
+carbon_stock[blue_carbon_map == 1] = 200  # Mangroves
+carbon_stock[blue_carbon_map == 2] = 150  # Seagrass
+carbon_stock[blue_carbon_map == 3] = 100  # Salt Marsh
+
+# Step 4: Save as GeoTIFF (optional)
+with rasterio.open(
+    "blue_carbon_map.tif", "w",
+    driver="GTiff",
+    height=blue_carbon_map.shape[0],
+    width=blue_carbon_map.shape[1],
+    count=1,
+    dtype=blue_carbon_map.dtype,
+    crs="+proj=latlong",
+    transform=transform
+) as dst:
+    dst.write(blue_carbon_map, 1)
+
+# Step 5: Visualization
+fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+im1 = ax[0].imshow(blue_carbon_map, cmap="viridis")
+ax[0].set_title("Blue Carbon Habitat Map")
+plt.colorbar(im1, ax=ax[0], label="Habitat Class (1=Mangrove, 2=Seagrass, 3=Salt Marsh)")
+
+im2 = ax[1].imshow(carbon_stock, cmap="YlGn")
+ax[1].set_title("Estimated Carbon Stock (tons/ha)")
+plt.colorbar(im2, ax=ax[1], label="Carbon Stock")
+plt.tight_layout()
+plt.show()
